@@ -13,9 +13,13 @@ h1{font-size:16px;margin:0 0 8px}p{margin:0 0 10px}
 .clip{overflow:hidden;border:2px solid #222;background:#fff}
 iframe{border:0;transform-origin:0 0;display:block}
 .nav a{margin-right:8px}
+.stack{position:relative}.stack iframe{position:absolute;left:0;top:0}.ab .stack iframe[data-v=Proposed]{visibility:hidden}.ab.showP .stack iframe[data-v=Proposed]{visibility:visible}.ab.showP .stack iframe[data-v=Current]{visibility:hidden}
+.tag{display:inline-block;padding:0 6px;background:#222;color:#fff}.showP .tag.c,.ab:not(.showP) .tag.p{display:none}
 </style>
 <h1>VGC Dex UI comparisons</h1>
-<p><select id="pick"></select> <label><input type="checkbox" id="full"> show desktop at 100%</label></p>
+<p><select id="pick"></select> <label><input type="checkbox" id="full"> show desktop at 100%</label>
+ · <label><input type="radio" name="mode" value="side" checked> Side by side</label> <label><input type="radio" name="mode" value="ab"> A/B toggle</label>
+ <span id="abctl" hidden> · <button type="button" id="flip">Flip (space)</button> <label><input type="checkbox" id="auto"> auto-flip every 1s</label> · showing <b id="showing">Current</b></span></p>
 <div id="desc"></div>
 <div id="root"></div>
 <script>
@@ -109,16 +113,31 @@ function build() {
   const widths = s.w || [1280, 360];
   const sets = [];
   for (const w of widths) for (const theme of ['light', 'dark']) sets.push([`${w === 1280 ? 'Desktop' : w === 640 ? 'Tablet 640' : 'Mobile'} ${theme === 'light' ? 'Light' : 'Dark'}`, w, theme]);
-  root.innerHTML = sets.map(([name, w, theme]) => `<div class="set"><h2>${name}</h2><div class="pair">${['Current', 'Proposed'].map(v => {
+  const ab = mode() === 'ab'; abctl.hidden = !ab; root.className = ab ? 'ab' + (showP ? ' showP' : '') : '';
+  const frame = (v, w, h, sc, theme) => `<iframe data-v="${v}" src="index.html?theme=${theme}${s.page ? '&' + s.page : ''}" style="width:${w}px;height:${h}px;transform:scale(${sc})"></iframe>`;
+  root.innerHTML = sets.map(([name, w, theme]) => {
     const sc = w === 1280 && !full.checked ? 0.5 : 1; const h = (s.h && s.h[w]) || DEF_H[w];
-    return `<div class="cell"><b>${name} — ${v}</b><div class="clip" style="width:${w * sc}px;height:${h * sc}px"><iframe data-v="${v}" src="index.html?theme=${theme}${s.page ? '&' + s.page : ''}" style="width:${w}px;height:${h}px;transform:scale(${sc})"></iframe></div></div>`;
-  }).join('')}</div></div>`).join('');
+    const box = inner => `<div class="clip stack" style="width:${w * sc}px;height:${h * sc}px">${inner}</div>`;
+    const body = ab
+      ? `<div class="cell"><b>${name} — <span class="tag c">Current</span><span class="tag p">Proposed</span></b>${box(frame('Current', w, h, sc, theme) + frame('Proposed', w, h, sc, theme))}</div>`
+      : ['Current', 'Proposed'].map(v => `<div class="cell"><b>${name} — ${v}</b>${box(frame(v, w, h, sc, theme))}</div>`).join('');
+    return `<div class="set"><h2>${name}</h2><div class="pair">${body}</div></div>`;
+  }).join('');
+  if (ab) for (const st of root.querySelectorAll('.stack')) { const [a, b] = st.querySelectorAll('iframe'); for (const [x, y] of [[a, b], [b, a]]) x.addEventListener('load', () => x.contentWindow.addEventListener('scroll', () => { const wx = x.contentWindow, wy = y.contentWindow; if (wy && (wy.scrollY !== wx.scrollY || wy.scrollX !== wx.scrollX)) wy.scrollTo(wx.scrollX, wx.scrollY); })); }
   for (const f of root.querySelectorAll('iframe')) f.addEventListener('load', async () => {
-    await ready(f); const d = f.contentDocument;
+    await ready(f); const d = f.contentDocument; f.contentWindow.addEventListener('keydown', onKey);
     addCss(d, 'html{scrollbar-width:none}::-webkit-scrollbar{display:none}'); addCss(d, s.bothCss); if (s.both) s.both(d);
     if (f.dataset.v === 'Proposed') { addCss(d, s.css); if (s.js) s.js(d); }
   }, { once: true });
 }
+let showP = false, timer = null;
+const mode = () => document.querySelector('input[name=mode]:checked').value;
+function flipAB() { showP = !showP; root.classList.toggle('showP', showP); showing.textContent = showP ? 'Proposed' : 'Current'; }
+flip.onclick = () => { flipAB(); flip.blur(); };
+const onKey = e => { if (e.code === 'Space' && mode() === 'ab' && !/^(SELECT|INPUT|TEXTAREA|BUTTON)$/.test(e.target.tagName)) { e.preventDefault(); flipAB(); } };
+addEventListener('keydown', onKey);
+auto.onchange = () => { clearInterval(timer); if (auto.checked) timer = setInterval(flipAB, 1000); };
+document.querySelectorAll('input[name=mode]').forEach(r => r.onchange = () => { if (mode() !== 'ab') { auto.checked = false; clearInterval(timer); } build(); });
 pick.onchange = build; full.onchange = build;
 if (location.hash) pick.value = location.hash.slice(1);
 build();
