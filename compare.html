@@ -13,6 +13,7 @@ h1{font-size:16px;margin:0 0 8px}p{margin:0 0 10px}
 .clip{overflow:hidden;border:2px solid #222;background:#fff}
 iframe{border:0;transform-origin:0 0;display:block}
 .nav a{margin-right:8px}
+#legend{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 0;font-size:12px}#legend span{padding:2px 6px;border:1px solid #444}
 .stack{position:relative}.stack iframe{position:absolute;left:0;top:0}.ab .stack iframe[data-v=Proposed]{visibility:hidden}.ab.showP .stack iframe[data-v=Proposed]{visibility:visible}.ab.showP .stack iframe[data-v=Current]{visibility:hidden}
 .tag{display:inline-block;padding:0 6px;background:#222;color:#fff}.showP .tag.c,.ab:not(.showP) .tag.p{display:none}
 </style>
@@ -20,6 +21,7 @@ iframe{border:0;transform-origin:0 0;display:block}
 <p><select id="pick"></select> <label><input type="checkbox" id="full"> show desktop at 100%</label>
  · <label><input type="radio" name="mode" value="side" checked> Side by side</label> <label><input type="radio" name="mode" value="ab"> A/B toggle</label>
  <span id="abctl" hidden> · <button type="button" id="flip">Flip (space)</button> <label><input type="checkbox" id="auto"> auto-flip every 1s</label> · showing <b id="showing">Current</b></span></p>
+<div id="legend"></div>
 <div id="desc"></div>
 <div id="root"></div>
 <script>
@@ -101,7 +103,17 @@ const S = [
 ];
 
 const DEF_H = { 1280: 330, 640: 560, 360: 420 };
-pick.innerHTML = S.map(s => `<option value="${s.id}">${s.title}</option>`).join('');
+// grouping from the comparison with the reference site's advanced search stylesheet
+const GROUPS = {
+  ref: ['#b7e4b0', 'From the reference site', ['6', '8']],
+  part: ['#e3efb0', 'Partly from the reference site', ['4', '7', '9']],
+  against: ['#f2b8b5', 'Against the reference site', ['h', '3', '5', '18', '19']],
+  value: ['#b9d4f5', 'User value, not from the reference site', ['1', '2', '14', '16', '17']],
+  own: ['#d6d6d6', 'Consistency for its own sake', ['10', '11', '12', '13', '15']],
+};
+const groupOf = id => Object.values(GROUPS).find(g => g[2].includes(id));
+legend.innerHTML = Object.values(GROUPS).map(([c, l]) => `<span style="background:${c}">${l}</span>`).join('');
+pick.innerHTML = S.map(s => `<option value="${s.id}" style="background:${groupOf(s.id)[0]}">${s.title}</option>`).join('');
 const cur = () => S.find(s => s.id === pick.value) || S[0];
 
 function ready(f) { return new Promise(res => { const t0 = Date.now(); (function poll() { const d = f.contentDocument; const m = d && d.querySelector('#app main'); if ((m && m.innerHTML.length > 50 && !d.querySelector('#app main').textContent.includes('Loading')) || Date.now() - t0 > 8000) setTimeout(res, 400); else setTimeout(poll, 150); })(); }); }
@@ -109,7 +121,7 @@ function addCss(d, css) { if (!css) return; const st = d.createElement('style');
 
 function build() {
   const s = cur(); location.hash = s.id;
-  desc.innerHTML = `<b>What changed:</b> ${s.what}`;
+  const g = groupOf(s.id); pick.style.background = g[0]; desc.innerHTML = `<b>What changed:</b> ${s.what}<br><b>Group:</b> <span style="background:${g[0]};padding:0 4px">${g[1]}</span>`;
   const widths = s.w || [1280, 360];
   const sets = [];
   for (const w of widths) for (const theme of ['light', 'dark']) sets.push([`${w === 1280 ? 'Desktop' : w === 640 ? 'Tablet 640' : 'Mobile'} ${theme === 'light' ? 'Light' : 'Dark'}`, w, theme]);
