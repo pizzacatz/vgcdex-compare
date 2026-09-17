@@ -1,36 +1,125 @@
-<!-- THROWAWAY comparison page. Not deployed (deploy.sh copies named files only). Delete when done. -->
+<!-- THROWAWAY comparison page. Not deployed with the site. Delete when done. -->
 <meta charset="utf-8">
-<title>Compare: header control sizing</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VGC Dex UI comparisons</title>
 <style>
-body{margin:0;padding:16px;font:14px Inter,system-ui,sans-serif;background:#888}
-h1{font-size:16px;margin:0 0 4px}p{margin:0 0 12px}
+body{margin:0;padding:16px;font:14px Inter,system-ui,sans-serif;background:#888;color:#111}
+h1{font-size:16px;margin:0 0 8px}p{margin:0 0 10px}
+#pick{font:inherit;padding:4px;max-width:100%}
+#desc{background:#fff;padding:8px 10px;margin:8px 0 14px;max-width:1300px}
 .set{margin:0 0 24px}.set h2{font-size:14px;margin:0 0 6px;background:#222;color:#fff;padding:4px 8px;display:inline-block}
 .pair{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
 .cell b{display:block;margin:0 0 4px}
 .clip{overflow:hidden;border:2px solid #222;background:#fff}
 iframe{border:0;transform-origin:0 0;display:block}
+.nav a{margin-right:8px}
 </style>
-<h1>Header controls, search field and buttons: one sizing system (38px tall, 16px text), desktop and mobile</h1>
-<p>Page shown: results for <code>t:fire</code>. Desktop frames are scaled; <label><input type="checkbox" id="full"> show desktop at 100%</label></p>
+<h1>VGC Dex UI comparisons</h1>
+<p><select id="pick"></select> <label><input type="checkbox" id="full"> show desktop at 100%</label></p>
+<div id="desc"></div>
 <div id="root"></div>
 <script>
-const PROPOSED = `
-.topsearch input{height:38px;box-sizing:border-box;font-size:16px;padding-block:0}
-.topsearch button{height:38px;width:38px;padding:0;font-size:16px}
-.topnav{font-size:16px}
-#theme,.menubtn{height:38px;width:38px;min-width:38px;box-sizing:border-box;padding:0}
-#sort{height:38px;box-sizing:border-box;font-size:16px}
-.seg{display:inline-flex}.seg a{height:38px;box-sizing:border-box;display:inline-flex;align-items:center;font-size:16px}
-`;
-const SETS = [['Desktop Light', 1280, 'light'], ['Desktop Dark', 1280, 'dark'], ['Mobile Light', 360, 'light'], ['Mobile Dark', 360, 'dark']];
-const H = { 1280: 330, 360: 420 };
-function build(scale) {
-  root.innerHTML = SETS.map(([name, w, theme]) => `<div class="set"><h2>${name}</h2><div class="pair">${['Current', 'Proposed'].map(v => {
-    const s = w === 1280 ? scale : 1;
-    return `<div class="cell"><b>${name} — ${v}</b><div class="clip" style="width:${w * s}px;height:${H[w] * s}px"><iframe data-v="${v}" src="index.html?theme=${theme}&q=t:fire" style="width:${w}px;height:${H[w]}px;transform:scale(${s})"></iframe></div></div>`;
+// helpers run inside a frame's document
+const each = (d, fn) => { for (const el of d.querySelectorAll('body *')) if (!el.closest('svg')) fn(el); };
+const snap = (v, scale) => scale.reduce((a, b) => Math.abs(b - v) < Math.abs(a - v) ? b : a);
+const replaceText = (d, from, to) => { const w = d.createTreeWalker(d.body, NodeFilter.SHOW_TEXT); let n; while ((n = w.nextNode())) if (n.nodeValue.includes(from)) n.nodeValue = n.nodeValue.split(from).join(to); };
+const relabel = (d, sel, map) => d.querySelectorAll(sel).forEach(el => { const t = el.textContent.trim(); if (map[t] != null) { const tn = [...el.childNodes].reverse().find(c => c.nodeType === 3 && c.nodeValue.trim()) || el.querySelector('span'); if (tn) tn.textContent = map[t]; } });
+const scrollTo = (d, fn) => { const el = fn(d); if (el) d.defaultView.scrollTo(0, el.getBoundingClientRect().top + d.defaultView.scrollY - 8); };
+const heading = (d, txt) => [...d.querySelectorAll('h2,h3')].find(h => h.textContent.startsWith(txt));
+const SVG = p => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${p}"/></svg>`;
+
+// each entry: title, what changed, page, optional widths/heights, css (Proposed only), js (Proposed only), both (all frames, before css/js)
+const S = [
+{ id: 'h', title: 'Header sizing: controls 38px tall, 16px text (earlier test)', page: 'q=t:fire',
+  what: 'Header search field, search button, header links, theme/☰ button, Sort dropdown and Grid/List switch: 38px tall, 16px text, on desktop and mobile.',
+  css: `.topsearch input{height:38px;box-sizing:border-box;font-size:16px;padding-block:0}.topsearch button{height:38px;width:38px;padding:0;font-size:16px}.topnav{font-size:16px}#theme,.menubtn{height:38px;width:38px;min-width:38px;box-sizing:border-box;padding:0}#sort{height:38px;box-sizing:border-box;font-size:16px}.seg{display:inline-flex}.seg a{height:38px;box-sizing:border-box;display:inline-flex;align-items:center;font-size:16px}` },
+{ id: '1', title: '1. Empty values: hyphen instead of em-dash', page: 'q=kind:move t:fire order:bp dir:asc&view=list',
+  what: 'Every "—" empty-value mark (BP, Acc, etc.) becomes "-".', js: d => replaceText(d, '—', '-') },
+{ id: '2', title: '2. Syntax guide lists every sort key', page: 'guide=1', both: d => scrollTo(d, d => heading(d, 'Scope')),
+  what: 'The order: line lists all keys: name, dex, hp, atk, def, spa, spd, spe, total, kg, bp, acc, pp, prio, type, cat, count.',
+  js: d => replaceText(d, 'spe, bp, name, dex, total, …', 'name, dex, hp, atk, def, spa, spd, spe, total, kg, bp, acc, pp, prio, type, cat, count') },
+{ id: '3', title: '3. Type scale: every font size snapped to 11 / 12.75 / 15 / 16.5 / 24 / 30 px', page: 'species=charizardmegax', h: { 1280: 700, 360: 900 },
+  what: 'Each element\'s text size is rounded to the nearest of 11, 12.75, 15, 16.5, 24, 30px (currently 38 distinct sizes).',
+  js: d => { const cs = d.defaultView.getComputedStyle, todo = []; each(d, el => { const v = parseFloat(cs(el).fontSize); const t = snap(v, [11, 12.75, 15, 16.5, 24, 30]); if (t !== v) todo.push([el, t]); }); todo.forEach(([el, t]) => el.style.fontSize = t + 'px'); } },
+{ id: '4', title: '4. One monospace font list', page: 'guide=1',
+  what: 'All monospace text uses ui-monospace, SFMono-Regular, Menlo, Consolas, monospace. On most devices this looks identical; the difference is only on systems where the three current lists resolve to different fonts.',
+  css: `code,pre,.num,#q,.qpreview,.bigstat b,.scard td:last-child,.msub .form-input,.dup.msub .form-input{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace!important}` },
+{ id: '5', title: '5. One control height (38px), text size unchanged', page: 'q=t:fire',
+  what: 'Header search field and button, theme/☰ button, Sort dropdown and Grid/List switch are all 38px tall like the form fields. Text sizes stay as they are.',
+  css: `.topsearch input{height:38px;box-sizing:border-box;padding-block:0}.topsearch button{height:38px;width:38px;padding:0}#theme,.menubtn{height:38px;width:38px;min-width:38px;box-sizing:border-box;padding:0}#sort{height:38px;box-sizing:border-box}.seg{display:inline-flex}.seg a{height:38px;box-sizing:border-box;display:inline-flex;align-items:center}` },
+{ id: '6', title: '6. Phone form: 16px dropdowns; submit button same size at every width', page: 'adv=1', h: { 1280: 700, 360: 900 },
+  what: 'On phones the form dropdowns use 16px text like the text fields (now 14px), and "Search with these options" uses 15px at every width (now 13px on phones).',
+  css: `@media (max-width:700px){.band>select.form-input.auto,.form-input.auto{font-size:16px!important}}.submit-n{font-size:15px!important}` },
+{ id: '7', title: '7. One secondary button style', page: 'adv=1', h: { 1280: 700, 360: 900 },
+  both: d => { d.querySelector('#menubtn')?.click(); },
+  what: 'Copy link, Reset, Grid/List, phone menu items and home link boxes share one look: card background, 1px border, regular weight, the shared shadow. (Phone menu opened in all frames.)',
+  css: `.reset-n,.seg,.topmenu a,.topmenu button,.homelinks a{background:var(--card)!important;border:1px solid var(--line)!important;color:var(--text)!important;font-weight:400!important;box-shadow:var(--shadow)!important}.seg a{border:0!important}` },
+{ id: '8', title: '8. Drawn icons for the desktop search and theme buttons', page: 'q=t:fire', w: [1280],
+  what: 'The ⌕ and ◐ text characters become line icons in the same style as the phone menu icons. Desktop only (phones have neither button).',
+  js: d => { const b = d.querySelector('.topsearch button'); if (b) b.innerHTML = SVG('M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14z M20 20l-4-4'); const t = d.querySelector('#theme'); if (t) t.innerHTML = SVG('M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18z M12 3v18 M12 7h3.5 M12 11h5 M12 15h4.5'); } },
+{ id: '9', title: '9. One focus style', page: 'adv=1', h: { 1280: 420, 360: 520 },
+  both: d => { d.querySelector('#q')?.classList.add('ff'); d.querySelector('.form-input[data-fs=name]')?.classList.add('ff'); d.querySelector('.tokens, .tok-wrap .form-input')?.classList.add('ff'); },
+  bothCss: `#q.ff{outline:2px solid var(--gpe-peach);outline-offset:-1px}@media (max-width:700px){#q.ff{outline:0}}.form-input.ff,.tokens.ff{box-shadow:0 0 3px var(--field-line);border-color:var(--accent)}`,
+  what: 'Focus is simulated on the header search, the Name field and the Types field (focus normally shows one at a time). Proposed: all use a 2px accent outline and no glow.',
+  css: `.ff{outline:2px solid var(--accent)!important;outline-offset:-1px!important;box-shadow:none!important}` },
+{ id: '10', title: '10. One Mega badge and one "new" marker', page: 'species=charizardmegax', h: { 1280: 700, 360: 900 },
+  both: d => scrollTo(d, d => d.querySelector('h1')),
+  what: 'The outlined "Mega" badge (title, lists) takes the card style (black, gold text). The "New in M-C" and "NEW" markers both become uppercase 9px weight 800. Scroll down in a frame to see cards.',
+  css: `.badge{background:var(--gpe-black)!important;color:var(--gpe-gold)!important;border:0!important;font-size:.58rem!important;font-weight:800!important;letter-spacing:.06em!important;padding:2px 6px!important}.newreg,.newpill{text-transform:uppercase;font-size:.6rem!important;letter-spacing:.06em!important;font-weight:800!important}` },
+{ id: '11', title: '11. One chip style', page: 'q=kind:item',
+  what: 'Item category chips match type chips: uppercase, weight 700, same small size in cards (phones included).',
+  css: `.chip.neutral{text-transform:uppercase!important;font-weight:700!important;letter-spacing:.04em!important;font-size:.66rem!important;padding:2px 7px!important}` },
+{ id: '12', title: '12. Casing: Title Case for buttons and links, same names everywhere', page: 'q=t:fire', h: { 1280: 330, 360: 520 },
+  both: d => { d.querySelector('#menubtn')?.click(); },
+  what: 'Header "Syntax" → "Syntax Guide", "Random" → "Random Mon", theme tooltip "Toggle Theme", "Edit in advanced search" → "Edit in Advanced Search", "Search all kinds" → "Search All Kinds". (Phone menu opened in all frames.)',
+  js: d => { relabel(d, '.topnav a, .editadv', { 'Syntax': 'Syntax Guide', 'Random': 'Random Mon', 'Edit in advanced search': 'Edit in Advanced Search', 'Search all kinds': 'Search All Kinds' }); d.querySelector('#theme')?.setAttribute('title', 'Toggle Theme'); } },
+{ id: '13', title: '13. One section heading style', page: 'species=charizardmegax', h: { 1280: 700, 360: 900 },
+  both: d => scrollTo(d, d => heading(d, 'Abilities')),
+  what: 'Pokémon/move/item page section headings (ABILITIES, STATS, LEARNSET…) use the results-group heading style: Montserrat 16.5px, normal case, text color, muted count.',
+  css: `.page-main h3{font-family:Montserrat,Inter,system-ui,sans-serif!important;font-size:1.1rem!important;text-transform:none!important;letter-spacing:-.01em!important;color:var(--text)!important;font-weight:700!important}` },
+{ id: '14', title: '14. In-text links always accent-colored', page: 'q=t:fire&view=list',
+  what: 'Ability names in the Pokémon list are accent-colored like other links (now text color until hovered).',
+  css: `.list.species .abil a{color:var(--accent)!important}` },
+{ id: '15', title: '15. Hard-coded colors moved into theme variables', page: 'q=t:fire',
+  what: 'Code-only change. Nothing should look different; both sides are identical on purpose.' },
+{ id: '16', title: '16. Dark theme header gets its own shade', page: 'q=t:fire',
+  what: 'In dark theme the header uses the #1a1a1a surface instead of the page black. Light theme unchanged.',
+  css: `:root[data-theme=dark] .top{background:var(--gpe-surface)!important}` },
+{ id: '17', title: '17. One phone breakpoint (700px): home page', page: '', w: [640, 360], h: { 640: 560, 360: 560 },
+  what: 'Shown at 640px (tablet) and 360px. At 561–700px the home page now uses its phone layout (tagline break, smaller search bar), matching the header, which already switches at 700px. 360px is identical on both sides.',
+  css: `@media (max-width:700px){.tlbr{display:inline}.tagline{font-size:min(1.6rem,6.4vw)}.homesearch input{height:56px;font-size:1rem;padding:0 10px 0 52px}.homesearch .hicon{width:28px;height:28px;left:13px}}` },
+{ id: '18', title: '18. Spacing scale: gaps and padding snapped to 4 / 8 / 12 / 16 / 24 px', page: 'q=t:fire', h: { 1280: 700, 360: 900 },
+  what: 'Every gap and padding value is rounded to the nearest of 0, 4, 8, 12, 16, 24px (currently 15 distinct gaps).',
+  js: d => { const cs = d.defaultView.getComputedStyle, sc = [0, 4, 8, 12, 16, 24], todo = []; each(d, el => { const c = cs(el); const st = {}; for (const p of ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'rowGap', 'columnGap']) { const v = parseFloat(c[p]); if (!isNaN(v) && v <= 30) { const t = snap(v, sc); if (t !== v) st[p] = t + 'px'; } } if (Object.keys(st).length) todo.push([el, st]); }); todo.forEach(([el, st]) => Object.assign(el.style, st)); } },
+{ id: '19', title: '19. Shared shadow on every frame', page: 'move=earthquake', h: { 1280: 700, 360: 900 },
+  what: 'List table frames, notices, the move stat block and phone menu items get the same shadow as cards and home link boxes.',
+  css: `.tablewrap,.notice,.bigstat,.topmenu a,.topmenu button{box-shadow:var(--shadow)!important}` },
+];
+
+const DEF_H = { 1280: 330, 640: 560, 360: 420 };
+pick.innerHTML = S.map(s => `<option value="${s.id}">${s.title}</option>`).join('');
+const cur = () => S.find(s => s.id === pick.value) || S[0];
+
+function ready(f) { return new Promise(res => { const t0 = Date.now(); (function poll() { const d = f.contentDocument; const m = d && d.querySelector('#app main'); if ((m && m.innerHTML.length > 50 && !d.querySelector('#app main').textContent.includes('Loading')) || Date.now() - t0 > 8000) setTimeout(res, 400); else setTimeout(poll, 150); })(); }); }
+function addCss(d, css) { if (!css) return; const st = d.createElement('style'); st.textContent = css; d.head.appendChild(st); }
+
+function build() {
+  const s = cur(); location.hash = s.id;
+  desc.innerHTML = `<b>What changed:</b> ${s.what}`;
+  const widths = s.w || [1280, 360];
+  const sets = [];
+  for (const w of widths) for (const theme of ['light', 'dark']) sets.push([`${w === 1280 ? 'Desktop' : w === 640 ? 'Tablet 640' : 'Mobile'} ${theme === 'light' ? 'Light' : 'Dark'}`, w, theme]);
+  root.innerHTML = sets.map(([name, w, theme]) => `<div class="set"><h2>${name}</h2><div class="pair">${['Current', 'Proposed'].map(v => {
+    const sc = w === 1280 && !full.checked ? 0.5 : 1; const h = (s.h && s.h[w]) || DEF_H[w];
+    return `<div class="cell"><b>${name} — ${v}</b><div class="clip" style="width:${w * sc}px;height:${h * sc}px"><iframe data-v="${v}" src="index.html?theme=${theme}${s.page ? '&' + s.page : ''}" style="width:${w}px;height:${h}px;transform:scale(${sc})"></iframe></div></div>`;
   }).join('')}</div></div>`).join('');
-  for (const f of root.querySelectorAll('iframe[data-v=Proposed]')) f.addEventListener('load', () => { const st = f.contentDocument.createElement('style'); st.textContent = PROPOSED; f.contentDocument.head.appendChild(st); });
+  for (const f of root.querySelectorAll('iframe')) f.addEventListener('load', async () => {
+    await ready(f); const d = f.contentDocument;
+    addCss(d, 'html{scrollbar-width:none}::-webkit-scrollbar{display:none}'); addCss(d, s.bothCss); if (s.both) s.both(d);
+    if (f.dataset.v === 'Proposed') { addCss(d, s.css); if (s.js) s.js(d); }
+  }, { once: true });
 }
-full.onchange = () => build(full.checked ? 1 : 0.5);
-build(0.5);
+pick.onchange = build; full.onchange = build;
+if (location.hash) pick.value = location.hash.slice(1);
+build();
 </script>
