@@ -130,7 +130,7 @@ const GROUPS = {
 };
 const groupOf = id => Object.values(GROUPS).find(g => g[2].includes(id));
 // owner decisions: done = shipped to the live site (D-66), declined = not doing
-const DONE = ['1', '2', '14', '16', '4', '13', '15', 'f9', 'f20', 'f25'], DECLINED = ['17', '19', 'f10', 'f24'], DONE_BG = '#c7a8f0';
+const DONE = ['1', '2', '14', '16', '4', '13', '15', 'f9', 'f20', 'f25', '10', '11', '12', '18'], DECLINED = ['17', '19', 'f10', 'f24'], DONE_BG = '#c7a8f0';
 const strike = t => [...t].map(ch => ch + '\u0336').join('');
 const bgOf = id => DONE.includes(id) ? DONE_BG : groupOf(id)[0];
 legend.innerHTML = Object.values(GROUPS).map(([c, l]) => `<span style="background:${c}">${l}</span>`).join('') + `<span style="background:${DONE_BG}">Done (live on the site)</span><span style="background:#fff;text-decoration:line-through">Declined</span>`;
@@ -143,7 +143,7 @@ function addCss(d, css) { if (!css) return; const st = d.createElement('style');
 function build() {
   const s = cur(); location.hash = s.id;
   const g = groupOf(s.id); pick.style.background = bgOf(s.id); pick.style.textDecoration = DECLINED.includes(s.id) ? 'line-through' : '';
-  const status = DONE.includes(s.id) ? '<br><b>Status:</b> <span style="background:' + DONE_BG + ';padding:0 4px">Done, live on the site (' + (['1', '2', '14', '16'].includes(s.id) ? 'D-66' : 'D-67') + '). Current and Proposed now look the same.</span>' : DECLINED.includes(s.id) ? '<br><b>Status:</b> <s>Declined</s> (not doing)' : ''; desc.innerHTML = `<b>What changed:</b> ${s.what}<br><b>Audit findings covered:</b> ${COVERS[s.id].join(', ')}<br><b>Group:</b> <span style="background:${g[0]};padding:0 4px">${g[1]}</span>${status}`;
+  const status = DONE.includes(s.id) ? '<br><b>Status:</b> <span style="background:' + DONE_BG + ';padding:0 4px">Done, live on the site (' + (['1', '2', '14', '16'].includes(s.id) ? 'D-66' : ['10', '11', '12', '18'].includes(s.id) ? 'D-70' : 'D-67') + '). Current and Proposed now look the same.</span>' : DECLINED.includes(s.id) ? '<br><b>Status:</b> <s>Declined</s> (not doing)' : ''; desc.innerHTML = `<b>What changed:</b> ${s.what}<br><b>Audit findings covered:</b> ${COVERS[s.id].join(', ')}<br><b>Group:</b> <span style="background:${g[0]};padding:0 4px">${g[1]}</span>${status}`;
   const widths = s.w || [1280, 360];
   const sets = [];
   for (const w of widths) for (const theme of ['light', 'dark']) sets.push([`${w === 1280 ? 'Desktop' : w === 640 ? 'Tablet 640' : 'Mobile'} ${theme === 'light' ? 'Light' : 'Dark'}`, w, theme]);
