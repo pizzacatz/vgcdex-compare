@@ -1,0 +1,36 @@
+<!-- THROWAWAY comparison page. Not deployed (deploy.sh copies named files only). Delete when done. -->
+<meta charset="utf-8">
+<title>Compare: header control sizing</title>
+<style>
+body{margin:0;padding:16px;font:14px Inter,system-ui,sans-serif;background:#888}
+h1{font-size:16px;margin:0 0 4px}p{margin:0 0 12px}
+.set{margin:0 0 24px}.set h2{font-size:14px;margin:0 0 6px;background:#222;color:#fff;padding:4px 8px;display:inline-block}
+.pair{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
+.cell b{display:block;margin:0 0 4px}
+.clip{overflow:hidden;border:2px solid #222;background:#fff}
+iframe{border:0;transform-origin:0 0;display:block}
+</style>
+<h1>Header controls, search field and buttons: one sizing system (38px tall, 16px text), desktop and mobile</h1>
+<p>Page shown: results for <code>t:fire</code>. Desktop frames are scaled; <label><input type="checkbox" id="full"> show desktop at 100%</label></p>
+<div id="root"></div>
+<script>
+const PROPOSED = `
+.topsearch input{height:38px;box-sizing:border-box;font-size:16px;padding-block:0}
+.topsearch button{height:38px;width:38px;padding:0;font-size:16px}
+.topnav{font-size:16px}
+#theme,.menubtn{height:38px;width:38px;min-width:38px;box-sizing:border-box;padding:0}
+#sort{height:38px;box-sizing:border-box;font-size:16px}
+.seg{display:inline-flex}.seg a{height:38px;box-sizing:border-box;display:inline-flex;align-items:center;font-size:16px}
+`;
+const SETS = [['Desktop Light', 1280, 'light'], ['Desktop Dark', 1280, 'dark'], ['Mobile Light', 360, 'light'], ['Mobile Dark', 360, 'dark']];
+const H = { 1280: 330, 360: 420 };
+function build(scale) {
+  root.innerHTML = SETS.map(([name, w, theme]) => `<div class="set"><h2>${name}</h2><div class="pair">${['Current', 'Proposed'].map(v => {
+    const s = w === 1280 ? scale : 1;
+    return `<div class="cell"><b>${name} — ${v}</b><div class="clip" style="width:${w * s}px;height:${H[w] * s}px"><iframe data-v="${v}" src="index.html?theme=${theme}&q=t:fire" style="width:${w}px;height:${H[w]}px;transform:scale(${s})"></iframe></div></div>`;
+  }).join('')}</div></div>`).join('');
+  for (const f of root.querySelectorAll('iframe[data-v=Proposed]')) f.addEventListener('load', () => { const st = f.contentDocument.createElement('style'); st.textContent = PROPOSED; f.contentDocument.head.appendChild(st); });
+}
+full.onchange = () => build(full.checked ? 1 : 0.5);
+build(0.5);
+</script>
