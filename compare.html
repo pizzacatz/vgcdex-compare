@@ -167,7 +167,11 @@ const onKey = e => { if (e.code === 'Space' && mode() === 'ab' && !/^(SELECT|INP
 addEventListener('keydown', onKey);
 auto.onchange = () => { clearInterval(timer); if (auto.checked) timer = setInterval(flipAB, 1000); };
 document.querySelectorAll('input[name=mode]').forEach(r => r.onchange = () => { if (mode() !== 'ab') { auto.checked = false; clearInterval(timer); } build(); });
-pick.onchange = build; full.onchange = build;
+const store = { get: k => { try { return localStorage.getItem('cmp-' + k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem('cmp-' + k, v); } catch (e) {} } };
+full.checked = store.get('full') === '1';
+const savedMode = store.get('mode'); if (savedMode) document.querySelector(`input[name=mode][value=${savedMode}]`).checked = true;
+document.querySelectorAll('input[name=mode]').forEach(r => r.addEventListener('change', () => store.set('mode', mode())));
+pick.onchange = build; full.onchange = () => { store.set('full', full.checked ? '1' : '0'); build(); };
 if (location.hash) pick.value = location.hash.slice(1);
 build();
 </script>
