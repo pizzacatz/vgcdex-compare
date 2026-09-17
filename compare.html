@@ -100,6 +100,9 @@ const S = [
 { id: '19', title: '19. Shared shadow on every frame', page: 'move=earthquake', h: { 1280: 700, 360: 900 },
   what: 'List table frames, notices, the move stat block and phone menu items get the same shadow as cards and home link boxes.',
   css: `.tablewrap,.notice,.bigstat,.topmenu a,.topmenu button{box-shadow:var(--shadow)!important}` },
+{ id: 'tap', title: 'Sweep 7. Tap targets at least 40px on phones', page: 'q=t:fire', w: [360], h: { 360: 560 },
+  what: 'Sweep item 7. On a 360px results page 33 links and controls are under 32px tall. Proposed: Grid/List, Sort, the count-line links and the footer link get 40px tall touch areas (the results bar grows taller as a result, the trade-off that made you decline audit item 5).',
+  css: `.seg a{min-height:40px;display:inline-flex;align-items:center;padding:0 12px}#sort{height:40px}.controls .count a.editadv{display:inline-flex;align-items:center;min-height:40px}.foot a.gpe{display:inline-block;padding:10px 0}.controls-in{min-height:56px}` },
 { id: 'f9', title: 'F9. Page title weight: 800 everywhere', page: 'guide=1', h: { 1280: 330, 360: 420 },
   what: 'Finding 9 (no suggestion was made). The syntax guide title uses weight 700; Pokémon, move, ability and item page titles use 800. Proposed: the guide title uses 800 too.',
   css: `.page h1{font-weight:800!important}` },
@@ -117,7 +120,7 @@ const S = [
   js: d => { const q = d.querySelector('#q'); if (q) q.placeholder = 'Search Pokémon, moves, abilities, items…'; } },
 ];
 // findings from the audit that each suggestion covers
-const COVERS = { h: [5, 12], 1: [1], 2: [2], 3: [3, 5, 8], 4: [4], 5: [12], 6: [6, 7], 7: [11], 8: [13], 9: [14], 10: [16, 17], 11: [18, 19], 12: [22, 23], 13: [21], 14: [26], 15: [27], 16: [28], 17: [29], 18: [30], 19: [15], f9: [9], f10: [10], f20: [20], f24: [24], f25: [25] };
+const COVERS = { tap: ['sweep 7'], h: [5, 12], 1: [1], 2: [2], 3: [3, 5, 8], 4: [4], 5: [12], 6: [6, 7], 7: [11], 8: [13], 9: [14], 10: [16, 17], 11: [18, 19], 12: [22, 23], 13: [21], 14: [26], 15: [27], 16: [28], 17: [29], 18: [30], 19: [15], f9: [9], f10: [10], f20: [20], f24: [24], f25: [25] };
 
 const DEF_H = { 1280: 330, 640: 560, 360: 420 };
 // grouping from the comparison with the reference site's advanced search stylesheet
@@ -127,6 +130,7 @@ const GROUPS = {
   against: ['#f2b8b5', 'Against the reference site', ['h', '3', '5', '18', '19']],
   value: ['#b9d4f5', 'User value, not from the reference site', ['1', '2', '14', '16', '17']],
   own: ['#d6d6d6', 'Consistency for its own sake', ['10', '11', '12', '13', '15', 'f9', 'f10', 'f20', 'f24', 'f25']],
+  sweep: ['#ffd9a8', '2026-09-17 sweep, undecided', ['tap']],
 };
 const groupOf = id => Object.values(GROUPS).find(g => g[2].includes(id));
 // owner decisions: done = shipped to the live site (D-66), declined = not doing

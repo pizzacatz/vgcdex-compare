@@ -256,7 +256,7 @@ function search(idx, q) {
 function abilityMatches(abTerms, e, idx) { const out = []; if (e.kind !== 'species') return out; for (const n of abTerms) { const b = EFF_BUCKET[F[n.field].name], v = n.vn; if (b(e.eff[v])) continue; for (const sl of e.abilitySlugs) { const ab = idx.abilityBySlug[sl]; if (ab && b(effWith(e, v, sl, idx)) && !out.includes(ab)) out.push(ab); } } return out; }
 function subMatches(subs, e, idx) { const out = []; for (const n of subs) { if (F[n.field].name === 'a' && e.kind === 'species') { for (const sl of e.abilitySlugs) { const ab = idx.abilityBySlug[sl]; if (ab && evalNode(n.sub, ab, idx) && !out.includes(ab)) out.push(ab); } continue; } if (F[n.field].name === 'm' && e.kind === 'species') for (const sl of e.learnset) { const mv = idx.moveBySlug[sl]; if (mv && evalNode(n.sub, mv, idx) && !out.includes(mv)) out.push(mv); } else if (F[n.field].name === 'lb' && e.kind === 'move') for (const sp of (idx.learnedBy[e.slug] || [])) if (evalNode(n.sub, sp, idx) && !out.includes(sp)) out.push(sp); } return out; }
 
-// ---------- UI (reference-style layout on GeorgiaPlayEvents tokens) ----------
+// ---------- UI (Scryfall-style layout on GeorgiaPlayEvents tokens) ----------
 const $ = s => document.querySelector(s);
 const scroller = () => null;
 function scrollTop0() { const sc = scroller(); if (sc) sc.scrollTo(0, 0); else window.scrollTo(0, 0); }
@@ -351,6 +351,9 @@ function abilityTable(rows) { return `<div class="tablewrap"><table class="list 
 const icatChips = e => e.cats.map(c => `<span class="chip neutral">${esc(c)}</span>`).join(' ');
 function itemTable(rows) { return `<div class="tablewrap"><table class="list items"><thead><tr><th></th>${sortTh('Name', 'name', 'name')}${sortTh('Category', 'cat', 'icat')}<th>Effect</th></tr></thead><tbody>${rows.map(e => `<tr><td class="thumb">${e.sprite ? `<img src="${e.sprite}" alt="" loading="lazy">` : ''}</td><td class="name"><a href="${plink(e)}" data-nav>${esc(e.name)}</a></td><td class="icat">${icatChips(e)}</td><td class="muted">${esc(e.raw.short_desc || e.raw.description || '')}</td></tr>`).join('')}</tbody></table></div>`; }
 function itemCard(e) { return `<a class="scard icard" href="${plink(e)}" data-nav><div class="dtop"><div class="art">${e.sprite ? `<img src="${e.sprite}" alt="" loading="lazy">` : ''}${e.reg === IDX.currentReg ? `<span class="newreg">New in ${esc(e.reg)}</span>` : (e.legality[IDX.currentReg] === 'banned' ? '<span class="newreg banned">Banned</span>' : '')}</div><div class="icats">${e.cats.map(c => `<span class="chip neutral">${esc(c)}</span>`).join('')}</div></div><div class="nm">${esc(e.name)}</div></a>`; }
+// which kinds each sort key can order (sweep item 1)
+const SORT_KINDS = { '': ['species','move','ability','item'], name: ['species','move','ability','item'], dex: ['species'], hp: ['species'], atk: ['species'], def: ['species'], spa: ['species'], spd: ['species'], spe: ['species'], total: ['species'], kg: ['species'], bp: ['move'], acc: ['move'], pp: ['move'], prio: ['move'], type: ['species','move'], cat: ['move','item'], count: ['ability'] };
+const sortsFor = (scope, cur) => SORTS.filter(([v]) => v === cur || !SORT_KINDS[v] || SORT_KINDS[v].some(k => scope.includes(k)));
 const SORTS = [['', 'Relevance'], ['name', 'Name'], ['dex', 'Dex #'], ['hp', 'HP'], ['atk', 'Attack'], ['def', 'Defense'], ['spa', 'Special Attack'], ['spd', 'Special Defense'], ['spe', 'Speed'], ['total', 'Total'], ['bp', 'Base Power'], ['acc', 'Accuracy'], ['pp', 'PP'], ['prio', 'Priority'], ['type', 'Type'], ['cat', 'Category'], ['count', 'Pokémon count']];
 function withoutKind(q) { let ast; try { ast = parse(q); } catch (e) { return null; } if (!ast) return null; const items = ast.type === 'and' ? ast.items : [ast]; const isKind = it => (it.type === 'term' && F[it.field] && F[it.field].name === 'kind') || (it.type === 'or' && it.items.every(x => x.type === 'term' && F[x.field] && F[x.field].name === 'kind')); if (!items.some(isKind)) return null; const rest = items.filter(it => !isKind(it)); return rest.length ? rest.map(astText).join(' ') : null; }
 function results(st) {
@@ -358,20 +361,22 @@ function results(st) {
   try { r = search(IDX, q); }
   catch (err) { if (!(err instanceof QueryError)) throw err; const [s, e] = err.span || [0, 0];
     return `<section class="wrap"><div class="notice error"><b>${err.kind === 'syntax' ? 'Syntax error' : 'Scope error'}.</b> ${esc(err.message)}<pre><code>${esc(q.slice(0, s))}<mark>${esc(q.slice(s, e) || ' ')}</mark>${esc(q.slice(e))}</code></pre>${err.kind === 'semantic' ? '<p>Add <code>kind:species</code> or <code>kind:move</code>, or split it into two searches.</p>' : '<p>See the <a href="?guide=1" data-nav>syntax guide</a>.</p>'}<p><a href="${qlink(q).replace('?q=', '?adv=1&q=')}" data-nav>Edit in Advanced Search</a></p></div></section>`; }
-  SUBS = r.subs || []; ABT = r.abTerms || []; SORT = { order: r.order || '', dir: r.dir || '', link: (k, d) => qlink(`${stripOrder(q)} order:${k}${d ? ' dir:' + d : ''}`.trim()) + (st.view !== 'grid' ? '&view=' + st.view : '') };
+  SUBS = r.subs || []; ABT = r.abTerms || [];
+  const ignored = IGNORED.length ? `<div class="ignored">${ignoredLine(IGNORED)}</div>` : ''; IGNORED = []; SORT = { order: r.order || '', dir: r.dir || '', link: (k, d) => qlink(`${stripOrder(q)} order:${k}${d ? ' dir:' + d : ''}`.trim()) + (st.view !== 'grid' ? '&view=' + st.view : '') };
   const scopeTxt = r.scope.length === 4 ? 'all kinds' : r.scope.map(k => KIND_LABEL[k]).join(', ');
   const curOrder = r.order || '';
-  const controls = `<div class="controls"><div class="wrap controls-in"><div class="count"><b>${r.results.length}</b> result${r.results.length === 1 ? '' : 's'} <span class="muted">· ${scopeTxt}</span> <a class="editadv" href="${qlink(q).replace('?q=', '?adv=1&q=')}${st.view === 'list' ? '&view=list' : ''}" data-nav>Edit in Advanced Search</a>${withoutKind(q) ? `<a class="editadv" href="${qlink(withoutKind(q))}" data-nav>Search All Kinds</a>` : ''}</div>
+  const controls = `<div class="controls"><div class="wrap controls-in"><div class="count"><b>${r.results.length}</b> result${r.results.length === 1 ? '' : 's'} <span class="muted">· ${scopeTxt}</span> <a class="editadv" href="${qlink(q).replace('?q=', '?adv=1&q=')}${st.view === 'list' ? '&view=list' : ''}" data-nav>Edit in Advanced Search</a>${withoutKind(q) ? `<a class="editadv" href="${qlink(withoutKind(q))}" data-nav>Search All Kinds</a>` : ''}${ignored}</div>
     <div class="ctl"><label>View</label><span class="seg"><a href="${setParam('view', 'grid')}" data-nav class="${st.view === 'grid' ? 'on' : ''}">Grid</a><a href="${setParam('view', 'list')}" data-nav class="${st.view === 'list' ? 'on' : ''}">List</a></span>
-    <label>Sort</label><select id="sort">${SORTS.map(([v, l]) => `<option value="${v}" ${v === curOrder ? 'selected' : ''}>${l}</option>`).join('')}</select></div></div></div>`;
+    <label>Sort</label><select id="sort">${sortsFor(r.scope, curOrder).map(([v, l]) => `<option value="${v}" ${v === curOrder ? 'selected' : ''}>${l}</option>`).join('')}</select></div></div></div>`;
   if (!r.results.length) return controls + `<section class="wrap"><div class="notice zero"><b>No results.</b> The query parsed fine and was searched across ${scopeTxt}.<ul><li>Bare words match <b>names</b> only. Use <code>o:</code> for description text.</li><li>Stats are the in-game values, not base stats.</li><li><code>m:</code> wants a move name, e.g. <code>m:"iron head"</code>.</li></ul><p><a href="${qlink(q).replace('?q=', '?adv=1&q=')}" data-nav>Edit in Advanced Search</a>${withoutKind(q) ? ` · <a href="${qlink(withoutKind(q))}" data-nav>Search all kinds for these terms</a>` : ''}</p></div></section>`;
+  const h1 = `<h1 class="vh">Search results for ${esc(q)}</h1>`;
   const groups = {}; for (const e of r.results) (groups[e.kind] ||= []).push(e);
   let body = '';
   for (const k of KINDS) { const rows = groups[k]; if (!rows) continue; const cap = rows;
     let inner; if (k === 'species') inner = st.view === 'list' ? speciesTable(cap) : `<div class="sgrid">${cap.map(speciesCard).join('')}</div>`;
     else if (k === 'move') inner = moveTable(cap); else if (k === 'ability') inner = abilityTable(cap); else inner = st.view === 'list' ? itemTable(cap) : `<div class="sgrid">${cap.map(itemCard).join('')}</div>`;
     body += `<section class="wrap group"><h2>${KIND_LABEL[k]} <span class="muted">${rows.length}</span></h2>${inner}</section>`; }
-  return controls + body;
+  return controls + h1 + body;
 }
 
 // ----- detail pages -----
@@ -434,7 +439,7 @@ function guide() {
   <h2>Examples</h2><div class="ex-grid">${EXAMPLES.map(([q, why]) => `<a class="ex" href="${qlink(q)}" data-nav><code>${esc(q)}</code><span>${esc(why)}</span></a>`).join('')}</div></section>`;
 }
 
-// ---------- advanced search form (home page) — reference advanced-search structure ----------
+// ---------- advanced search form (home page) — Scryfall /advanced structure ----------
 // Move properties. Classifications = the game's own 12 labels (classification table, kind=classification), keyed by Showdown flag id.
 const CLASS_BY_FLAG = { bullet: 'Ball & Bomb', bite: 'Biting', dance: 'Dance', explosive: 'Explosive', heal: 'Healing', mental: 'Mental', powder: 'Powder', pulse: 'Pulse', punch: 'Punching', slicing: 'Slicing', sound: 'Sound-Based', wind: 'Wind' };
 const CLASS_NOTE = { explosive: 'Champions-native. Explosion, Self-Destruct and Misty Explosion only (Healing Wish tested negative). Damp prevents these.', mental: 'Champions-native. Taunt, Attract, Encore, Disable, Torment. No item or ability reads this; Mental Herb keys on the condition, not the move.' };
@@ -556,7 +561,7 @@ function tokLabel(key, v) { const m = TK_META()[key]; const hit = m.items.find(x
 function tokNote(key, v) { const m = TK_META()[key]; const hit = m.items.find(x => x[0] === v); return hit && hit[3] ? hit[3] : ''; }
 function tokens(key) { const fs = FS, m = TK_META()[key]; return `<div class="tok-wrap"><div class="tokens" data-tk="${key}">${fs[key].map((x, i) => `<div class="tok"><button type="button" class="tok-x" data-tx="${key}" data-i="${i}" aria-label="Remove">×</button><button type="button" class="pol ${x.neg ? 'not' : 'is'}" data-pol="${key}" data-i="${i}" title="Toggle include / exclude">${x.neg ? 'NOT' : 'IS'}</button><span class="tok-l" title="${esc(tokNote(key, x.v))}">${key === 'types' ? pill(x.v) : x.expr ? `<code class="tok-expr">${esc(x.v)}</code>` : esc(tokLabel(key, x.v))}</span></div>`).join('')}<input type="text" class="tok-in" data-tkin="${key}" placeholder="${esc(m.placeholder)}" autocomplete="off" autocapitalize="off" spellcheck="false"></div><div class="tok-menu" data-menu="${key}" hidden></div></div>`; }
 function singlePicker(key, fsField, value) { const m = TK_META()[key]; return `<div class="tok-wrap single"><input type="text" class="form-input tok-in" data-fs="${fsField}" data-tkin="${key}" data-single="1" value="${esc(value)}" placeholder="${esc(m.placeholder)}" autocomplete="off" autocapitalize="off" spellcheck="false"><div class="tok-menu" data-menu="${key}" hidden></div></div>`; }
-// --- suggestion menu (reference-style list directly under the field; one entry per row) ---
+// --- suggestion menu (Scryfall-style list directly under the field; one entry per row) ---
 let MENU = { key: null, rows: [], hi: -1 };
 let MENU_HOLD = false;
 document.addEventListener('pointerdown', ev => { MENU_HOLD = !!ev.target.closest('.tok-menu'); if (!MENU_HOLD && MENU.menu && !MENU.menu.hidden && !ev.target.closest('.tok-wrap') && !(MENU.input && ev.target === MENU.input)) closeMenu(); }, true);
@@ -643,7 +648,7 @@ function advForm() {
     + row('lb', 'Learned by', band(singlePicker('species', 'lb', fs.lb)), 'Only moves this Pokémon can learn.');
   else if (T === 'item') body = row('item', 'Item category', band(tokens('icats')), 'Berry, Mega Stone, Recovery, Consumable, Held… Every “IS” category must apply; “NOT” excludes.');
   const prefs = row('pref', 'Preferences', band(sel('view', [['grid', 'Display as Grid'], ['list', 'Display as List']], fs.view) + sel('order', sorts.map(([v, l]) => [v, 'Sort by ' + l]), fs.order) + `<select class="form-input auto" data-fs="dir" ${fs.order ? '' : 'disabled'}>${[['asc', 'Ascending'], ['desc', 'Descending']].map(([v, l]) => `<option value="${v}" ${(fs.dir || naturalDir(fs.order)) === v ? 'selected' : ''}>${l}</option>`).join('')}</select>`, 'prefs'), '');
-  return `<section class="wrap adv">${tabs}<form id="adv" class="form-layout" novalidate>
+  return `<section class="wrap adv"><h1 class="vh">Advanced search</h1>${tabs}<form id="adv" class="form-layout" novalidate>
   ${shared1}${body}<div class="settings-sep"><span>Search settings</span></div>${regulationRow}${prefs}
   <div class="form-row also" ${fs.also.length ? '' : 'hidden'}><label class="form-row-label short">${icon('crit')} Also</label><div class="form-row-content"><div class="band"><code id="also">${esc(fs.also.join(' '))}</code></div><p class="form-row-tip">Terms from the typed query this tab has no control for. They stay in the search.</p></div></div>
   <div class="submit-bar"><div class="qwrap"><code id="qpreview" class="qpreview" title="The query this form will run"></code><span id="qcount" class="qcount"></span></div><button type="button" class="reset-n icon-n" id="copylink" title="Copy a link to this search" aria-label="Copy link"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4.5V3h6v1.5"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="M9 11h6M9 15h6"/></svg><span class="lbl">Copy link</span></button><button type="button" class="reset-n icon-n" id="reset" title="Reset the form" aria-label="Reset"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg><span class="lbl">Reset</span></button><button type="submit" class="submit-n" id="go">Search with these options</button></div>
@@ -664,7 +669,9 @@ function ensureDupRow(kind) { const fs = FS; if (kind === 'regs') { if (!fs.regs
   if (kind === 'matchups') { if (!fs.matchups.some(r => !r.type)) { fs.matchups.push({ rel: 'weak', type: '' }); $('#matchups-rows').insertAdjacentHTML('beforeend', matchRow(fs.matchups[fs.matchups.length - 1], fs.matchups.length - 1)); } return; }
   const rows = fs[kind]; if (rows.some(r => r.val === '')) return; const r = { stat: kind === 'stats' ? 'spe' : 'bp', op: '>=', val: '' }; rows.push(r); $('#' + kind + '-rows').insertAdjacentHTML('beforeend', dupRow(kind, r, rows.length - 1, kind === 'stats' ? STAT_OPTS : MNUM_OPTS)); }
 function updatePreview() { if (!FS) return; const q = buildQuery(FS); const p = $('#qpreview'); if (p) p.textContent = q || ''; const go = $('#go'); if (go) go.disabled = !q; const c = $('#qcount'); if (c) { let txt = ''; if (q) { try { const n = search(IDX, q).results.length; txt = n === 1 ? '1 result' : n + ' results'; } catch (e) { txt = e instanceof QueryError ? (e.kind === 'syntax' ? 'syntax error' : 'scope error') : ''; } } c.textContent = txt; } }
-function submitForm() { readForm(); const q = buildQuery(FS); if (!q) return; nav(qlink(q) + (FS.view === 'list' ? '&view=list' : '')); }
+function submitForm() { readForm(); const skipped = flushTokens(); readForm(); const q = buildQuery(FS);
+  if (!q) { const bar = $('#qcount'); if (bar && skipped.length) bar.innerHTML = `<span class="ignored">${ignoredLine(skipped)}</span>`; return; }
+  IGNORED = skipped; nav(qlink(q) + (FS.view === 'list' ? '&view=list' : '')); }
 function addToken(key, raw) {
   const v = raw.trim(); if (!v) return false; let val = v;
   if (key === 'types') { const t = norm(v); if (!IDX.types.includes(t)) return false; val = t; }
@@ -678,12 +685,22 @@ function addToken(key, raw) {
   if (FS[key].some(x => x.v === val)) return true;
   FS[key].push({ v: val, neg: false }); return true;
 }
+// typed-but-uncommitted text in a picker: commit it like Enter does; text that is not a
+// valid entry is left out of the search and reported once on the results page (D-79)
+let IGNORED = [];
+const TOK_FIELD = { moves: 'Learns', abilities: 'Abilities', types: 'Types', props: 'Properties', icats: 'Item category', crit: 'Formes' };
+function flushInput(input) { if (!input || input.dataset.single) return true; const v = input.value.trim(); if (!v) return true;
+  if (addToken(input.dataset.tkin, v)) { input.value = ''; rerenderTokens(input.dataset.tkin); return true; }
+  return false; }
+// returns the entries that could not be used; they stay in their boxes
+function flushTokens() { const skipped = []; for (const i of document.querySelectorAll('#adv .tok-in')) if (!flushInput(i)) skipped.push({ field: TOK_FIELD[i.dataset.tkin] || 'Field', text: i.value.trim() }); return skipped; }
+const ignoredLine = list => `Ignored: ${list.map(x => `“${esc(x.text)}” from ${esc(x.field)}`).join(', ')}.`;
 function rerenderTokens(key) { const box = $(`[data-tk="${key}"]`); if (!box) return; box.closest('.tok-wrap').outerHTML = tokens(key); updatePreview(); }
 function bindForm() {
   const f = $('#adv'); if (!f) return; updatePreview();
   f.addEventListener('input', ev => { const t = ev.target; if (t.classList.contains('tok-in')) { openMenu(t); if (t.dataset.single) readForm(); return; } readForm(); const row = t.closest('[data-row]'); if (row && t.dataset.f === 'val' && t.value !== '') ensureDupRow(row.dataset.row); });
   f.addEventListener('focusin', ev => { const t = ev.target; if (t.classList && t.classList.contains('tok-in')) openMenu(t); });
-  f.addEventListener('focusout', ev => { const t = ev.target; if (t.classList && t.classList.contains('tok-in') && !MENU_HOLD) closeMenu(); });
+  f.addEventListener('focusout', ev => { const t = ev.target; if (t.classList && t.classList.contains('tok-in') && !MENU_HOLD) { closeMenu(); flushInput(t); } });
   f.addEventListener('change', ev => { if (ev.target.classList.contains('tok-in')) return; readForm(); const row = ev.target.closest('[data-row]'); if (row && (ev.target.dataset.f === 'val' || ev.target.dataset.f === 'cat' || ev.target.dataset.f === 'reg')) ensureDupRow(row.dataset.row); });
   f.addEventListener('focusout', ev => { const row = ev.target.closest && ev.target.closest('[data-row]'); if (row && ev.target.dataset.f === 'val') { readForm(); ensureDupRow(row.dataset.row); } });
   f.addEventListener('keydown', ev => { const t = ev.target; if (!(t.classList && t.classList.contains('tok-in'))) return;
@@ -704,7 +721,7 @@ function bindForm() {
     if (!ev.target.closest('.pillsel')) f.querySelectorAll('.pill-menu').forEach(m => m.hidden = true);
   });
   f.addEventListener('submit', ev => { ev.preventDefault(); submitForm(); });
-  $('#copylink').addEventListener('click', () => { readForm(); const q = buildQuery(FS); if (!q) return; const url = location.origin + location.pathname + qlink(q) + (FS.view === 'list' ? '&view=list' : ''); const b = $('#copylink'); const lbl = b.querySelector('.lbl'); const done = () => { lbl.textContent = 'Copied'; b.classList.add('ok'); setTimeout(() => { lbl.textContent = 'Copy link'; b.classList.remove('ok'); }, 1500); }; if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, () => { prompt('Copy this link', url); }); else prompt('Copy this link', url); });
+  $('#copylink').addEventListener('click', () => { readForm(); const skipped = flushTokens(); readForm(); const q = buildQuery(FS); if (!q) { const bar = $('#qcount'); if (bar && skipped.length) bar.innerHTML = `<span class="ignored">${ignoredLine(skipped)}</span>`; return; } const url = location.origin + location.pathname + qlink(q) + (FS.view === 'list' ? '&view=list' : ''); const b = $('#copylink'); const lbl = b.querySelector('.lbl'); const done = () => { lbl.textContent = skipped.length ? 'Copied, some ignored' : 'Copied'; b.classList.add('ok'); setTimeout(() => { lbl.textContent = 'Copy link'; b.classList.remove('ok'); }, 1500); }; if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, () => { prompt('Copy this link', url); }); else prompt('Copy this link', url); });
   f.addEventListener('keydown', ev => { if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); submitForm(); } });
   $('#reset').addEventListener('click', () => { const tab = FS.tab; FS = emptyForm(); FS.tab = tab; history.replaceState('app', '', '?adv=1'); render(); });
   document.querySelectorAll('.tabs [data-tab]').forEach(a => a.addEventListener('click', ev => { ev.preventDefault(); readForm(); FS.tab = a.dataset.tab; FS.also = []; render(); }));
